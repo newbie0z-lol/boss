@@ -1,0 +1,211 @@
+-- 🧱 Load Service
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+	Character = char
+	HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+end)
+
+-- 🎨 Tạo GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "RezUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Position = UDim2.new(0.7, 0, 0.35, 0)
+frame.Size = UDim2.new(0, 260, 0, 230)
+frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+frame.BackgroundTransparency = 0.25
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+-- 🌈 Viền bảy màu
+local uiStroke = Instance.new("UIStroke", frame)
+uiStroke.Thickness = 2
+uiStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+task.spawn(function()
+	while true do
+		for h = 0, 1, 0.01 do
+			uiStroke.Color = Color3.fromHSV(h, 1, 1)
+			task.wait()
+		end
+	end
+end)
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+-- 🏷 Tiêu đề
+local title = Instance.new("TextLabel", frame)
+title.Text = "💀 Rez 💀"
+title.Position = UDim2.new(0, 0, 0, 5)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(0, 0, 0)
+title.Font = Enum.Font.FredokaOne
+title.TextSize = 22
+
+-- Tiêu đề phụ --
+local subtitle = Instance.new("TextLabel", frame)
+subtitle.Text = "by rez"
+subtitle.Position = UDim2.new(0, 0, 0, 35) -- ngay dưới title chính
+subtitle.Size = UDim2.new(1, 0, 0, 20)
+subtitle.BackgroundTransparency = 1
+subtitle.TextColor3 = Color3.fromRGB(100, 100, 100)
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextSize = 14
+
+
+-- 📦 Container nút
+local buttonContainer = Instance.new("Frame", frame)
+buttonContainer.Position = UDim2.new(0, 15, 0, 45)
+buttonContainer.Size = UDim2.new(1, -30, 1, -60)
+buttonContainer.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", buttonContainer)
+layout.FillDirection = Enum.FillDirection.Vertical
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.VerticalAlignment = Enum.VerticalAlignment.Center
+layout.Padding = UDim.new(0, 10)
+
+-- 🔘 Hàm tạo nút
+local function createButton(name)
+	local btn = Instance.new("TextButton")
+	btn.Text = name
+	btn.Size = UDim2.new(1, 0, 0, 40)
+	btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	btn.BackgroundTransparency = 0.2
+	btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+	btn.Font = Enum.Font.GothamMedium
+	btn.TextSize = 14
+
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	local stroke = Instance.new("UIStroke", btn)
+	stroke.Thickness = 1.2
+	stroke.Color = Color3.fromRGB(200, 200, 200)
+
+	return btn
+end
+
+-- ⚙️ Trạng thái
+local attacking, rotating, hitboxEnabled = false, false, false
+local bossTarget, hitboxPart, hitboxConnection
+local angle, radius = 0, 9
+
+-- 📍 Tìm boss gần
+local function getNearestBoss(maxDist)
+	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	local nearest, closest = nil, maxDist
+
+	for _, m in pairs(workspace:GetDescendants()) do
+		if m:IsA("Model") and m:FindFirstChild("Humanoid") and m:FindFirstChild("HumanoidRootPart") and m ~= Character then
+			local d = (root.Position - m.HumanoidRootPart.Position).Magnitude
+			if d < closest then
+				nearest, closest = m, d
+			end
+		end
+	end
+
+	return nearest
+end
+
+-- ⚔️ Auto Attack
+task.spawn(function()
+	while true do
+		task.wait(0.2)
+		if attacking then
+			local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+			if tool then pcall(function() tool:Activate() end) end
+		end
+	end
+end)
+
+-- 🔄 Xoay quanh boss
+RunService.RenderStepped:Connect(function(dt)
+	if rotating and bossTarget and bossTarget:FindFirstChild("HumanoidRootPart") then
+		angle += dt * 710
+		local offset = Vector3.new(math.cos(math.rad(angle)) * radius, 0, math.sin(math.rad(angle)) * radius)
+		HumanoidRootPart.CFrame = CFrame.new(bossTarget.HumanoidRootPart.Position + offset, bossTarget.HumanoidRootPart.Position)
+	end
+end)
+
+-- 💥 Toggle Hitbox
+local function toggleHitbox()
+	hitboxEnabled = not hitboxEnabled
+	hitboxBtn.Text = hitboxEnabled and "Tắt Hitbox Boss" or "Bật Hitbox Boss"
+
+	if hitboxEnabled then
+		local boss = getNearestBoss(100)
+		if boss then
+			if not hitboxPart then
+				hitboxPart = Instance.new("Part")
+				hitboxPart.Anchored = true
+				hitboxPart.CanCollide = false
+				hitboxPart.Size = Vector3.new(20, 20, 20)
+				hitboxPart.Transparency = 0.5
+				hitboxPart.Material = Enum.Material.Neon
+				hitboxPart.Color = Color3.fromRGB(255, 0, 0)
+				hitboxPart.Name = "BossHitbox"
+				hitboxPart.Parent = workspace
+			end
+			hitboxConnection = RunService.RenderStepped:Connect(function()
+				if hitboxEnabled and boss:FindFirstChild("HumanoidRootPart") then
+					hitboxPart.CFrame = boss.HumanoidRootPart.CFrame
+				else
+					if hitboxPart then hitboxPart:Destroy() hitboxPart = nil end
+					if hitboxConnection then hitboxConnection:Disconnect() hitboxConnection = nil end
+					hitboxEnabled = false
+					hitboxBtn.Text = "Bật Hitbox Boss"
+				end
+			end)
+		end
+	else
+		if hitboxPart then hitboxPart:Destroy() hitboxPart = nil end
+		if hitboxConnection then hitboxConnection:Disconnect() hitboxConnection = nil end
+	end
+end
+
+-- 🧠 Tạo & gán nút + sự kiện
+local autoAttackBtn = createButton("🗡️ Tự đánh khi cầm vũ khí")
+autoAttackBtn.Parent = buttonContainer
+autoAttackBtn.MouseButton1Click:Connect(function()
+	attacking = not attacking
+	autoAttackBtn.Text = attacking and "Đang tự đánh..." or "Tự đánh khi cầm vũ khí"
+end)
+
+local spinBossBtn = createButton("🔁 Xoay quanh boss gần")
+spinBossBtn.Parent = buttonContainer
+spinBossBtn.MouseButton1Click:Connect(function()
+	rotating = not rotating
+	if rotating then
+		bossTarget = getNearestBoss(100)
+		spinBossBtn.Text = bossTarget and "Đang xoay quanh..." or "Không tìm thấy Boss"
+		if not bossTarget then rotating = false end
+	else
+		bossTarget = nil
+		spinBossBtn.Text = "Xoay quanh boss gần"
+	end
+end)
+
+hitboxBtn = createButton("🟥 Bật Hitbox Boss")
+hitboxBtn.Parent = buttonContainer
+hitboxBtn.MouseButton1Click:Connect(toggleHitbox)
+
+-- ❌ Nút đóng
+local closeBtn = Instance.new("TextButton", frame)
+closeBtn.Text = "✖"
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.Size = UDim2.new(0, 30, 0, 25)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
