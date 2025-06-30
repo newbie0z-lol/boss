@@ -35,7 +35,6 @@ task.spawn(function()
 		end
 	end
 end)
-
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
 local title = Instance.new("TextLabel", frame)
@@ -88,12 +87,28 @@ end
 -- ⚙️ Config
 local rotating = false
 local target = nil
-local targetType = "Player" -- "Player" hoặc "Boss"
-local radius = 14
+local targetType = "Boss" -- hoặc "Player"
+local radius = 12
 local heightOffset = 0
-local speed = 3 -- vòng / giây (tăng để quay nhanh hơn)
+local speed = 4
 local angle = 0
+local attacking = false
+local autoCollect = false
 
+-- 📍 Tìm player gần
+local function getNearestPlayer(radiusSearch)
+	local closest, minDist = nil, radiusSearch
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+			if dist < minDist then
+				closest = player
+				minDist = dist
+			end
+		end
+	end
+	return closest and closest.Character
+end
 
 -- 📍 Tìm boss gần
 local function getNearestBoss(maxDist)
@@ -113,22 +128,21 @@ local function getNearestBoss(maxDist)
 	return nearest
 end
 
--- ▶️ Bắt đầu quay quanh mục tiêu
+-- ▶️ Start orbit
 local function startOrbit()
 	if rotating then return end
-
-	target = (targetType == "Player") and getNearestPlayer(100) or getNearestBoss(100)
-	if not target or not target:FindFirstChild("HumanoidRootPart") then
-		warn("❌ Không tìm thấy mục tiêu.")
-		return
-	end
-
 	rotating = true
 	angle = 0
 
 	RunService:UnbindFromRenderStep("OrbitAroundTarget")
 	RunService:BindToRenderStep("OrbitAroundTarget", Enum.RenderPriority.Character.Value, function(dt)
-		if not rotating or not target or not target:FindFirstChild("HumanoidRootPart") then return end
+		if not rotating then return end
+
+		-- boss chết → tìm boss mới
+		if not target or not target:FindFirstChild("HumanoidRootPart") or (target:FindFirstChild("Humanoid") and target.Humanoid.Health <= 0) then
+			target = (targetType == "Player") and getNearestPlayer(100) or getNearestBoss(100)
+			if not target then return end
+		end
 
 		local center = target.HumanoidRootPart.Position + Vector3.new(0, heightOffset, 0)
 		angle += dt * math.pi * 2 * speed
@@ -137,19 +151,24 @@ local function startOrbit()
 		local z = math.sin(angle) * radius
 		local orbitPosition = center + Vector3.new(x, 0, z)
 
-		-- Tween di chuyển đến vị trí và lock nhìn vào mục tiêu
-		local cf = CFrame.new(orbitPosition, center)
-		HumanoidRootPart.CFrame = cf
+		HumanoidRootPart.CFrame = CFrame.new(orbitPosition, center)
 	end)
 end
 
--- ⏹️ Dừng quay
 local function stopOrbit()
 	rotating = false
 	RunService:UnbindFromRenderStep("OrbitAroundTarget")
 end
 
-
+-- 🔘 UI Buttons
+local ToggleAutoAttack = createButton("🗡️ Tự đánh khi cầm vũ khí")
+local ToggleBossAttack = createButton("🔁 Di chuyển quanh boss")
+local ToggleCollect = createButton("📦 Tự nhặt vật phẩm / Đang Fix")
+local ToggleHealth = createButton("📊 Hiển thị máu")
+ToggleAutoAttack.Parent = buttonContainer
+ToggleBossAttack.Parent = buttonContainer
+ToggleCollect.Parent = buttonContainer
+ToggleHealth.Parent = buttonContainer
 
 -- 🗡️ Auto attack
 task.spawn(function()
@@ -162,7 +181,12 @@ task.spawn(function()
 	end
 end)
 
--- 📦 Nhặt đồ
+ToggleAutoAttack.MouseButton1Click:Connect(function()
+	attacking = not attacking
+	ToggleAutoAttack.Text = attacking and "✅ Đang lọ" or "🗡️ Tự đánh khi cầm vũ khí"
+end)
+
+-- 📦 Auto collect
 local function Prompt(proximityPrompt)
 	task.wait(0.1)
 	if proximityPrompt then
@@ -191,59 +215,26 @@ spawn(function()
 	end
 end)
 
--- 🔘 UI buttons
-local ToggleAutoAttack = createButton("🗡️ Tự đánh khi cầm vũ khí")
-local ToggleBossAttack = createButton("🔁 Di chuyển quanh boss")
-local ToggleCollect = createButton("📦 Tự nhặt vật phẩm")
-local ToggleHealth = createButton("📊 Hiển thị máu")
-
-ToggleAutoAttack.Parent = buttonContainer
-ToggleBossAttack.Parent = buttonContainer
-ToggleCollect.Parent = buttonContainer
-ToggleHealth.Parent = buttonContainer
-
-ToggleAutoAttack.MouseButton1Click:Connect(function()
-	attacking = not attacking
-	ToggleAutoAttack.Text = attacking and "✅ Đang tự đánh..." or "🗡️ Tự đánh khi cầm vũ khí"
-end)
-
 ToggleCollect.MouseButton1Click:Connect(function()
 	autoCollect = not autoCollect
-	ToggleCollect.Text = autoCollect and "Đã nói là đang fix mà??" or "📦 Tự nhặt vật phẩm / Đang Fix"
+	ToggleCollect.Text = autoCollect and "Đã nói là đang fix" or "📦 Tự nhặt vật phẩm"
 end)
 
--- ✔️ Nút Di chuyển quanh boss (Lock Aim)
+-- 🔁 Toggle boss orbit
 ToggleBossAttack.MouseButton1Click:Connect(function()
-	rotating = not rotating
 	if rotating then
-		bossTarget = getNearestBoss(100)
-		if bossTarget then
+		stopOrbit()
+		ToggleBossAttack.Text = "🔁 Di chuyển quanh boss"
+	else
+		startOrbit()
+		if target then
 			ToggleBossAttack.Text = "✅ Đang di chuyển quanh boss"
 		else
 			ToggleBossAttack.Text = "❌ Không tìm thấy boss"
-			rotating = false
 		end
-	else
-		ToggleBossAttack.Text = "🔁 Di chuyển quanh boss"
-		bossTarget = nil
 	end
 end)
 
-
-
--- ❌ Đóng UI
-local closeBtn = Instance.new("TextButton", frame)
-closeBtn.Text = "✖"
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
-closeBtn.Size = UDim2.new(0, 30, 0, 25)
-closeBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 14
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-closeBtn.MouseButton1Click:Connect(function()
-	gui:Destroy()
-end)
 
 -- 📊 Hiển thị máu
 local showHealth = false
