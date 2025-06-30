@@ -88,9 +88,9 @@ end
 local rotating = false
 local target = nil
 local targetType = "Boss" -- hoặc "Player"
-local radius = 12
+local radius = 18
 local heightOffset = 0
-local speed = 3
+local speed = 4
 local angle = 0
 local attacking = false
 local autoCollect = false
@@ -313,3 +313,5 @@ Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 closeBtn.MouseButton1Click:Connect(function()
 	gui:Destroy()
 end)
+
+--- Tìm dc source thì cx ma phết chứ đùa =)) nhma thôi tìm dc thì dùng đi , t code toàn bằng chat gpt , tốt bụng nữa thì để cre cũng dc kk , hân hạnh ---
