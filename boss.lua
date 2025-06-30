@@ -133,6 +133,7 @@ local function startOrbit()
 	if rotating then return end
 	rotating = true
 	angle = 0
+	target = nil
 
 	RunService:UnbindFromRenderStep("OrbitAroundTarget")
 	RunService:BindToRenderStep("OrbitAroundTarget", Enum.RenderPriority.Character.Value, function(dt)
