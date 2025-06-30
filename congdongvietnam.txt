@@ -90,7 +90,7 @@ local target = nil
 local targetType = "Boss" -- hoặc "Player"
 local radius = 12
 local heightOffset = 0
-local speed = 4
+local speed = 3
 local angle = 0
 local attacking = false
 local autoCollect = false
@@ -297,4 +297,19 @@ task.spawn(function()
 			end
 		end
 	end
+end)
+
+
+-- ❌ Đóng UI
+local closeBtn = Instance.new("TextButton", frame)
+closeBtn.Text = "✖"
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.Size = UDim2.new(0, 30, 0, 25)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
 end)
